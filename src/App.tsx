@@ -11,6 +11,15 @@ import UploadPapers from "./pages/UploadPapers";
 import EvalDetails from "./pages/EvalDetails";
 import StudentResults from "./pages/StudentResults";
 import Profile from "./pages/Profile";
+import AdminManageUsers from "./pages/AdminManageUsers";
+import AdminManageExams from "./pages/AdminManageExams";
+import AdminManageSubjects from "./pages/AdminManageSubjects";
+import AdminAllEvaluations from "./pages/AdminAllEvaluations";
+import AdminModelAnswers from "./pages/AdminModelAnswers";
+import StudentDashboard from "./pages/StudentDashboard";
+import StudentMyResults from "./pages/StudentMyResults";
+import StudentResultDetail from "./pages/StudentResultDetail";
+import StudentProfile from "./pages/StudentProfile";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -25,11 +34,22 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/register" element={<Register />} />
+          {/* Admin routes */}
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/manage-users" element={<AdminManageUsers />} />
+          <Route path="/manage-exams" element={<AdminManageExams />} />
+          <Route path="/manage-subjects" element={<AdminManageSubjects />} />
           <Route path="/upload" element={<UploadPapers />} />
-          <Route path="/evaluations" element={<EvalDetails />} />
-          <Route path="/results" element={<StudentResults />} />
+          <Route path="/all-evaluations" element={<AdminAllEvaluations />} />
+          <Route path="/eval-details" element={<EvalDetails />} />
+          <Route path="/model-answers" element={<AdminModelAnswers />} />
+          <Route path="/reports" element={<StudentResults />} />
           <Route path="/profile" element={<Profile />} />
+          {/* Student routes */}
+          <Route path="/student-dashboard" element={<StudentDashboard />} />
+          <Route path="/my-results" element={<StudentMyResults />} />
+          <Route path="/result-detail" element={<StudentResultDetail />} />
+          <Route path="/student-profile" element={<StudentProfile />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
