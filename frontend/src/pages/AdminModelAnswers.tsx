@@ -119,6 +119,42 @@ export default function AdminModelAnswers() {
     }
   };
 
+  // Handle JSON upload for bulk question/answer filling
+  const handleJsonUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!selectedExamId) {
+      toast.error('Select an exam first');
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!Array.isArray(data.qa)) {
+        toast.error('Invalid JSON format: missing qa array');
+        return;
+      }
+
+      // For each question/answer, create a model answer
+      data.qa.forEach((item: { question: string; answer: string }, idx: number) => {
+        if (item.question && item.answer) {
+          createMutation.mutate({
+            q: (questions?.length || 0) + idx + 1,
+            question: item.question,
+            modelAnswer: item.answer,
+            maxMarks: 10
+          });
+        }
+      });
+      toast.success('Bulk model answers uploaded!');
+    } catch (err) {
+      toast.error('Failed to parse JSON');
+      console.error(err);
+    }
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleKeyUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -144,6 +180,62 @@ export default function AdminModelAnswers() {
     }, 3000);
   };
 
+  const handleTestEvaluationJson = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return;
+    const file = e.target.files[0];
+    if (!selectedExamId) {
+      toast.error('Select an exam first to test evaluation');
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const studentData = JSON.parse(text);
+      if (!Array.isArray(studentData.qa)) {
+        toast.error('Invalid JSON format: missing qa array for evaluation');
+        return;
+      }
+
+      toast.loading('Running Semantic Evaluation...', { id: 'eval-json' });
+
+      // Transform JSON to match expected extracted_data format
+      const extracted_data = studentData.qa.map((item: any, idx: number) => {
+        const questionObj = questions.find(q => q.q === (idx + 1)) || questions[idx];
+        return {
+          question_id: questionObj?.id || String(idx + 1),
+          question_num: idx + 1,
+          student_question: item.question,
+          student_answer: item.answer,
+          raw_snippet: 'Simulated JSON Upload'
+        };
+      });
+
+      const res = await fetch(`http://localhost:5000/api/evaluate-confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          exam_id: selectedExamId,
+          roll_number: 'RESERVED_UNASSIGNED',
+          extracted_data: extracted_data
+        })
+      });
+
+      if (!res.ok) throw new Error('Evaluation failed. Has the Answer Key been saved?');
+      const result = await res.json();
+      
+      toast.success(`Evaluation Complete: Score ${result.score}/${result.total} marks (${result.percentage}).`, { 
+        id: 'eval-json',
+        duration: 8000
+      });
+      // Small visual breakdown in console
+      console.log('--- EVALUATION DETAILS ---');
+      result.details?.forEach((d: any) => console.log(`Q${d.question_num} [${d.score} marks]: ${d.evaluation_feedback}`));
+      
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to evaluate JSON', { id: 'eval-json' });
+    }
+  };
+
   return (
     <DashboardLayout>
       <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -164,6 +256,32 @@ export default function AdminModelAnswers() {
             <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={!selectedExamId}>
               <FileText className="mr-2 h-4 w-4" />
               Upload Key Paper
+            </Button>
+        
+            {/* JSON Upload for Bulk Q/A */}
+            <input
+              type="file"
+              className="hidden"
+              id="json-upload"
+              onChange={handleJsonUpload}
+              accept="application/json"
+            />
+            <Button variant="outline" onClick={() => document.getElementById('json-upload')?.click()} disabled={!selectedExamId}>
+              <FileText className="mr-2 h-4 w-4" />
+              Upload Q/A JSON
+            </Button>
+            
+            {/* Evaluation JSON Upload */}
+            <input
+              type="file"
+              className="hidden"
+              id="eval-json-upload"
+              onChange={handleTestEvaluationJson}
+              accept="application/json"
+            />
+            <Button className="bg-primary hover:bg-primary/90 text-white" onClick={() => document.getElementById('eval-json-upload')?.click()} disabled={!selectedExamId}>
+              <CheckCircle2 className="mr-2 h-4 w-4" />
+              Evaluate JSON Paper
             </Button>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>

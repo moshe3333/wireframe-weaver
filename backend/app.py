@@ -1,3 +1,4 @@
+
 import os
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
@@ -337,6 +338,34 @@ def extract_document_data():
     except Exception as e:
         return jsonify({"error": f"Failed to fetch context: {str(e)}"}), 500
 
+    # Special path: If the file is JSON, bypass OCR and textual regex parsing
+    if uploaded_files[0].filename.lower().endswith('.json'):
+        import json
+        try:
+            raw_text = uploaded_files[0].read().decode('utf-8')
+            student_data = json.loads(raw_text)
+            
+            qa_list = student_data.get('qa', [])
+            extracted_json = []
+            
+            for idx, item in enumerate(qa_list):
+                q_obj = model_questions[idx] if idx < len(model_questions) else None
+                extracted_json.append({
+                    "question_id": q_obj['id'] if q_obj else str(idx + 1),
+                    "question_num": idx + 1,
+                    "student_question": item.get('question', ''),
+                    "student_answer": item.get('answer', ''),
+                    "raw_snippet": "Direct JSON Upload"
+                })
+                
+            return jsonify({
+                "status": "extracted",
+                "extracted_data": extracted_json,
+                "raw_text": raw_text[:1000]
+            }), 200
+        except Exception as json_err:
+            return jsonify({"error": f"Invalid JSON file provided: {json_err}"}), 400
+
     combined_text = ""
     for f in uploaded_files:
         combined_text += extract_text_from_file(f) + "\n"
@@ -394,7 +423,8 @@ def evaluate_confirmed_data():
             # Check for exact normalized match
             if norm_s == norm_m and len(norm_m) > 0:
                 match_pct = 100
-                feedback = "Exact semantic logic found. Correct."
+                q_score = int(model_q.get('maxMarks', 10))
+                feedback = "Exact semantic logic found. Correct (Full Marks)."
             # Check for word-set similarity (handles word order or tiny additions)
             elif len(norm_m) > 0:
                 s_words = set(norm_s.split())
@@ -405,24 +435,28 @@ def evaluate_confirmed_data():
                 if len(m_words) > 0:
                     similarity = (len(intersection) / len(m_words)) * 100
                     
-                    if similarity >= 90:
-                        match_pct = 100 # Near perfect word match
-                        feedback = "Full semantic alignment with model key."
-                    elif similarity >= 60:
-                        match_pct = int(similarity)
-                        feedback = "Partial semantic match detected."
+                    if similarity >= 80:
+                        match_pct = 100
+                        q_score = int(model_q.get('maxMarks', 10))
+                        feedback = "Full semantic alignment with model key (Full Marks)."
+                    elif similarity >= 40:
+                        match_pct = 50
+                        q_score = int(model_q.get('maxMarks', 10)) / 2
+                        feedback = "Partial semantic match detected. Some mistakes (Half Marks)."
                     else:
-                        match_pct = int(similarity)
-                        feedback = "Low semantic alignment with model key."
+                        match_pct = 0
+                        q_score = 0
+                        feedback = "No semantic alignment snippet matches. Total mismatch (0 Marks)."
                 else:
                     match_pct = 0
+                    q_score = 0
                     feedback = "Insufficient content."
             else:
                 match_pct = 0
+                q_score = 0
                 feedback = "No model answer provided for comparison."
 
             q_max = int(model_q.get('maxMarks', 10))
-            q_score = int(q_max * (match_pct / 100))
             
             total_score += q_score
             max_total += q_max
@@ -430,9 +464,9 @@ def evaluate_confirmed_data():
             details.append({
                 "question_num": model_q.get('q'),
                 "instructor_question": model_q.get('question'),
-                "student_question": item.get('student_question'),
+                "student_question": item.get('student_question', item.get('question')),
                 "instructor_answer": model_q.get('modelAnswer'),
-                "student_answer": item.get('student_answer'),
+                "student_answer": item.get('student_answer', item.get('answer')),
                 "semantic_match_percentage": match_pct,
                 "score": f"{q_score}/{q_max}",
                 "evaluation_feedback": feedback

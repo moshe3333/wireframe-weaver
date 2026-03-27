@@ -396,13 +396,13 @@ export default function UploadPapers() {
                   className="hidden" 
                   ref={fileInputRef} 
                   onChange={onFileChange}
-                  accept=".pdf,.docx,.txt"
+                  accept=".json,application/json"
                 />
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
                   <FileUp className="h-7 w-7 text-primary" />
                 </div>
-                <p className="mb-1 text-sm font-bold">Upload Student PDF / Document</p>
-                <p className="mb-5 text-[10px] text-muted-foreground font-mono">PDF, DOCX OR PLAIN TEXT RECOMMENDED</p>
+                <p className="mb-1 text-sm font-bold">Upload Student JSON</p>
+                <p className="mb-5 text-[10px] text-muted-foreground font-mono">JSON FORMAT ONLY</p>
                 <Button variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>
                   Browse Files
                 </Button>
