@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Users, Search, Copy, Check, Loader2, Mail, Hash } from 'lucide-react';
-import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
+// import { db } from '@/lib/firebase';
+// import { collection, onSnapshot, query, where, orderBy } from 'firebase/firestore';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import API_BASE from '@/lib/api';
 
 export default function InstructorStudents() {
   const [students, setStudents] = useState<any[]>([]);
@@ -15,9 +16,11 @@ export default function InstructorStudents() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
+    let active = true;
+
     const fetchStudents = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/students/list');
+        const response = await fetch(`${API_BASE}/students/list`);
         if (!response.ok) throw new Error('Failed to fetch');
         const data = await response.json();
         
@@ -27,16 +30,22 @@ export default function InstructorStudents() {
           displayName: s.fullName || s.name || s.email?.split('@')[0] || 'Unknown Student'
         }));
 
-        setStudents(mapped);
+        if (active) setStudents(mapped);
       } catch (err) {
         console.error("Error fetching students:", err);
-        toast.error("Could not sync student list from secure server.");
+        if (active) toast.error("Could not sync student list from secure server.");
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     fetchStudents();
+    const timer = setInterval(fetchStudents, 5000);
+
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
   }, []);
 
   const handleCopy = (id: string) => {

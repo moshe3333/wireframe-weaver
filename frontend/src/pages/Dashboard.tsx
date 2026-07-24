@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Users, GraduationCap, FileText, CheckCircle, TrendingUp, Loader2 } from 'lucide-react';
-import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy, limit } from 'firebase/firestore';
+import API_BASE from '@/lib/api';
 
 const container = { hidden: {}, show: { transition: { staggerChildren: 0.1 } } };
 const item = { hidden: { opacity: 0, y: 15 }, show: { opacity: 1, y: 0 } };
@@ -19,54 +18,54 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Real-time stats
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-      const students = snap.docs.filter(d => d.data().role === 'student').length;
-      const instructors = snap.docs.filter(d => d.data().role === 'instructor').length;
-      setStats(prev => [
-        { ...prev[0], value: students.toString() },
-        { ...prev[1], value: instructors.toString() },
-        prev[2],
-        prev[3]
-      ]);
-    });
+    let active = true;
 
-    const unsubExams = onSnapshot(collection(db, 'exams'), (snap) => {
-      setStats(prev => [
-        prev[0],
-        prev[1],
-        { ...prev[2], value: snap.size.toString() },
-        prev[3]
-      ]);
-    });
+    const loadDashboard = async () => {
+      try {
+        const [usersRes, examsRes, resultsRes] = await Promise.all([
+          fetch(`${API_BASE}/users`),
+          fetch(`${API_BASE}/exams`),
+          fetch(`${API_BASE}/results`),
+        ]);
 
-    const unsubEvals = onSnapshot(collection(db, 'evaluations'), (snap) => {
-      setStats(prev => [
-        prev[0],
-        prev[1],
-        prev[2],
-        { ...prev[3], value: snap.size.toString() }
-      ]);
-    });
+        const users = usersRes.ok ? await usersRes.json() : [];
+        const exams = examsRes.ok ? await examsRes.json() : [];
+        const results = resultsRes.ok ? await resultsRes.json() : [];
 
-    const qRecent = query(collection(db, 'evaluations'), orderBy('timestamp', 'desc'), limit(5));
-    const unsubRecent = onSnapshot(qRecent, (snap) => {
-      const evals = snap.docs.map(doc => ({
-        id: doc.id,
-        student: doc.data().student_roll || 'Unknown',
-        exam: doc.data().exam_id || 'Math',
-        score: `${doc.data().score}/${doc.data().total || 100}`,
-        status: doc.data().status === 'success' ? 'Completed' : 'Pending'
-      }));
-      setRecentEvals(evals);
-      setLoading(false);
-    });
+        if (!active) return;
+
+        const userList = Array.isArray(users) ? users : [];
+        const examList = Array.isArray(exams) ? exams : [];
+        const resultList = Array.isArray(results) ? results : [];
+
+        const studentCount = userList.filter((u: any) => (u.role || '').toLowerCase() === 'student').length;
+        const instructorCount = userList.filter((u: any) => (u.role || '').toLowerCase() === 'instructor').length;
+
+        setStats([
+          { label: 'Total Students', value: String(studentCount), icon: GraduationCap, change: 'live' },
+          { label: 'Instructors', value: String(instructorCount), icon: Users, change: 'live' },
+          { label: 'Total Exams', value: String(examList.length), icon: FileText, change: 'live' },
+          { label: 'Evaluated', value: String(resultList.length), icon: CheckCircle, change: 'live' },
+        ]);
+
+        setRecentEvals(
+          resultList.slice(0, 5).map((r: any) => ({
+            id: r.id,
+            student: r.student || 'Unknown',
+            exam: r.exam || 'Unknown Exam',
+            score: r.marks || '0/0',
+            status: 'Completed',
+          }))
+        );
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    loadDashboard();
 
     return () => {
-      unsubUsers();
-      unsubExams();
-      unsubEvals();
-      unsubRecent();
+      active = false;
     };
   }, []);
 

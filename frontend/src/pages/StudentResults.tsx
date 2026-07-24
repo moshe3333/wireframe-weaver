@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Trophy, BarChart3, Award, Loader2, Download } from 'lucide-react';
-import { db, auth } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy, where, getDoc, doc } from 'firebase/firestore';
+import API_BASE, { getAuthData } from '@/lib/api';
 
 export default function StudentResults() {
   const [results, setResults] = useState<any[]>([]);
@@ -11,44 +10,48 @@ export default function StudentResults() {
   const [role, setRole] = useState('student');
 
   useEffect(() => {
+    let active = true;
+
     async function init() {
-      const user = auth.currentUser;
-      if (!user) return;
-
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      const userRole = userDoc.exists() ? userDoc.data().role : 'student';
-      setRole(userRole);
-
-      let q;
-      if (userRole === 'admin' || userRole === 'instructor') {
-        q = query(collection(db, 'evaluations'), orderBy('timestamp', 'desc'));
-      } else {
-        // Ideally filter by student roll number. For simple demo, we'll try to find their roll number.
-        const roll = userDoc.exists() ? userDoc.data().rollNumber : null;
-        if (roll) {
-          q = query(collection(db, 'evaluations'), where('student_roll', '==', roll), orderBy('timestamp', 'desc'));
-        } else {
-          q = query(collection(db, 'evaluations'), orderBy('timestamp', 'desc'));
+      const auth = getAuthData();
+      if (auth.token && auth.uid) {
+        const roleValue = (auth.role || 'student').toLowerCase();
+        if (active) setRole(roleValue);
+        
+        try {
+          const url = roleValue === 'admin' 
+            ? `${API_BASE}/evaluations`
+            : `${API_BASE}/evaluations?roll_number=${auth.uid}`;
+            
+          const resp = await fetch(url);
+          const data = await resp.json();
+          
+          if (Array.isArray(data)) {
+            const mapped = data.map(r => ({
+              id: r._id,
+              exam: r.exam_id || 'Unknown Exam',
+              student: r.roll_number,
+              date: new Date(r.timestamp).toLocaleDateString(),
+              marks: `${r.score}/${r.total}`,
+              pct: r.percentage?.replace('%', '') || '0',
+              grade: r.grade || 'N/A'
+            }));
+            if (active) setResults(mapped);
+          }
+        } catch (err) {
+          console.error("Error fetching results:", err);
         }
       }
-
-      const unsub = onSnapshot(q, (snap) => {
-        const data = snap.docs.map(doc => ({
-          id: doc.id,
-          exam: doc.data().exam_id || 'Unknown Exam',
-          student: doc.data().student_roll || 'N/A',
-          date: doc.data().timestamp ? new Date(doc.data().timestamp.seconds * 1000).toLocaleDateString() : 'N/A',
-          marks: `${doc.data().score}/${doc.data().total || 100}`,
-          pct: doc.data().total ? ((doc.data().score / doc.data().total) * 100).toFixed(0) : '0',
-          grade: (doc.data().score / (doc.data().total || 100)) >= 0.8 ? 'A' : (doc.data().score / (doc.data().total || 100)) >= 0.6 ? 'B' : 'C'
-        }));
-        setResults(data);
-        setLoading(false);
-      });
-
-      return () => unsub();
+      if (active) setLoading(false);
     }
+
     init();
+
+    const timer = setInterval(init, 5000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
   }, []);
 
   const stats = [

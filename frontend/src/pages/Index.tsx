@@ -4,9 +4,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import Navbar from '@/components/Navbar';
 import heroImage from '@/assets/hero-illustration.png';
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+// import { auth, db } from '@/lib/firebase';
+// import { onAuthStateChanged } from 'firebase/auth';
+// import { doc, getDoc } from 'firebase/firestore';
 import {
   ScanText, Brain, Users, BarChart3, Clock, Award, Shield, Upload,
   ArrowRight, Check
@@ -37,6 +37,8 @@ export default function Index() {
   const [sessionLoading, setSessionLoading] = useState(true);
 
   useEffect(() => {
+    // Firebase auth logic removed
+    /*
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         try {
@@ -60,6 +62,8 @@ export default function Index() {
     });
 
     return () => unsubscribe();
+    */
+    setSessionLoading(false);
   }, [navigate]);
 
   if (sessionLoading) {

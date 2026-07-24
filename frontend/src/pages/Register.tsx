@@ -5,10 +5,8 @@ import { Brain, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { auth, db } from '@/lib/firebase';
-import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
+import API_BASE from '@/lib/api';
 
 export default function Register() {
   const [showPw, setShowPw] = useState(false);
@@ -22,23 +20,17 @@ export default function Register() {
     e.preventDefault();
     setLoading(true);
     try {
-      // 1. Create user in Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      // 2. Update Firebase Profile
-      await updateProfile(user, { displayName: fullName });
-
-      // 3. Save User Data to Firestore (Default role: student)
-      await setDoc(doc(db, "users", user.uid), {
-        fullName,
-        email,
-        role: 'student',
-        createdAt: new Date().toISOString()
+      const resp = await fetch(`${API_BASE}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, fullName, accountType: "student" }),
       });
 
-      toast.success('Account created successfully!');
-      navigate('/signin');
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Registration failed");
+
+      toast.success("Account created successfully!");
+      navigate("/signin");
 
     } catch (error: any) {
       toast.error(error.message || 'Failed to create account');

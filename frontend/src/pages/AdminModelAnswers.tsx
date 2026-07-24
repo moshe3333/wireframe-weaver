@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, FileText, Loader2, Save, Trash2, CheckCircle2 } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import API_BASE from '@/lib/api';
 import {
   Dialog,
   DialogContent,
@@ -40,33 +41,36 @@ export default function AdminModelAnswers() {
   });
 
   // Fetch all exams for the dropdown
-  const { data: exams = [], isLoading: examsLoading } = useQuery({
+  const { data: exams = [], isLoading: examsLoading, isError: examsError } = useQuery({
     queryKey: ['exams'],
     queryFn: async () => {
-      const res = await fetch('http://localhost:5000/api/exams');
+      const res = await fetch(`${API_BASE}/exams`);
       if (!res.ok) throw new Error('Failed to fetch exams');
       const data = await res.json();
       if (data.length > 0 && !selectedExamId) {
         setSelectedExamId(String(data[0].id));
       }
       return data;
-    }
+    },
+    refetchInterval: 5000,
+    retry: 1,
   });
 
   // Fetch questions for the selected exam
   const { data: questions = [], isLoading: questionsLoading } = useQuery({
     queryKey: ['questions', selectedExamId],
     queryFn: async () => {
-      const res = await fetch(`http://localhost:5000/api/exams/${selectedExamId}/questions`);
+      const res = await fetch(`${API_BASE}/exams/${selectedExamId}/questions`);
       if (!res.ok) throw new Error('Failed to fetch questions');
       return res.json() as Promise<Question[]>;
     },
-    enabled: !!selectedExamId
+    enabled: !!selectedExamId,
+    refetchInterval: 5000,
   });
 
   const createMutation = useMutation({
     mutationFn: async (q: any) => {
-      const res = await fetch(`http://localhost:5000/api/exams/${selectedExamId}/questions`, {
+      const res = await fetch(`${API_BASE}/exams/${selectedExamId}/questions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(q)
@@ -88,7 +92,7 @@ export default function AdminModelAnswers() {
 
   const deleteMutation = useMutation({
     mutationFn: async (questionId: string) => {
-      const res = await fetch(`http://localhost:5000/api/exams/${selectedExamId}/questions/${questionId}`, {
+      const res = await fetch(`${API_BASE}/exams/${selectedExamId}/questions/${questionId}`, {
         method: 'DELETE'
       });
       if (!res.ok) throw new Error('Failed to delete question');
@@ -128,20 +132,27 @@ export default function AdminModelAnswers() {
       return;
     }
 
-    toast.loading('Processing Answer Key via OCR...', { id: 'ocr-key' });
-    
-    // Simulate OCR processing delay
-    setTimeout(() => {
-      // Create a few dummy questions as if they were extracted via OCR
-      const simulatedQuestions = [
-        { q: 1, question: "Explain logic from OCR scan", modelAnswer: "Perfectly matched content from physical paper", maxMarks: 10 },
-        { q: 2, question: "Physics Concept extracted", modelAnswer: "Detailed explanation found in physical scan", maxMarks: 15 }
-      ];
+    const file = e.target.files[0];
+    toast.loading('Importing answer key file...', { id: 'ocr-key' });
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
 
-      simulatedQuestions.forEach(q => createMutation.mutate(q));
-      
-      toast.success('OCR Scan Complete! Answer key populated.', { id: 'ocr-key' });
-    }, 3000);
+      const response = await fetch(`${API_BASE}/exams/${selectedExamId}/import-key`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to import answer key');
+
+      queryClient.invalidateQueries({ queryKey: ['questions', selectedExamId] });
+      toast.success(`Answer key imported. ${data.imported || 0} questions added.`, { id: 'ocr-key' });
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to import answer key', { id: 'ocr-key' });
+    } finally {
+      e.target.value = '';
+    }
   };
 
   return (
@@ -159,7 +170,7 @@ export default function AdminModelAnswers() {
               className="hidden" 
               ref={fileInputRef} 
               onChange={handleKeyUpload} 
-              accept=".pdf,.jpg,.jpeg,.png"
+              accept=".json,.pdf,.jpg,.jpeg,.png"
             />
             <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={!selectedExamId}>
               <FileText className="mr-2 h-4 w-4" />
@@ -250,6 +261,40 @@ export default function AdminModelAnswers() {
             </Select>
           </div>
           {examsLoading && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+          {examsError && <p className="text-xs text-destructive">Failed to load exams. Check backend connection.</p>}
+        </div>
+
+        <div className="rounded-xl border border-border bg-card p-4">
+          <h2 className="text-sm font-semibold text-foreground">Admin JSON Upload Format</h2>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Use this JSON structure when uploading question-answer data in bulk.
+          </p>
+          <pre className="mt-3 overflow-x-auto rounded-lg bg-secondary/40 p-3 text-xs text-foreground">
+{`{
+  "qa": [
+    {
+      "question": "What is your name?",
+      "answer": "My name is Ravi."
+    },
+    {
+      "question": "How old are you?",
+      "answer": "I am 7 years old."
+    },
+    {
+      "question": "What color is the sky?",
+      "answer": "The sky is blue."
+    },
+    {
+      "question": "How many legs does a dog have?",
+      "answer": "A dog has four legs."
+    },
+    {
+      "question": "What do you eat in the morning?",
+      "answer": "I eat breakfast in the morning."
+    }
+  ]
+}`}
+          </pre>
         </div>
 
         <div className="space-y-4">

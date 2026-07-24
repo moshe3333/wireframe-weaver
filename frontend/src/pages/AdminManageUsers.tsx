@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { UserPlus, Search, Edit, Trash2, Loader2, Shield } from 'lucide-react';
-import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+// import { db } from '@/lib/firebase';
+// import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import { toast } from 'sonner';
+import API_BASE from '@/lib/api';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,32 +24,50 @@ export default function AdminManageUsers() {
   const [updatingRole, setUpdatingRole] = useState<string | null>(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'users'), orderBy('fullName', 'asc'));
-    const unsub = onSnapshot(q, (snap) => {
-      const usersData = snap.docs.map(doc => ({
-        id: doc.id,
-        name: doc.data().fullName || 'No Name',
-        email: doc.data().email || 'No Email',
-        role: doc.data().role || 'student',
-        joined: doc.data().joinedAt ? (typeof doc.data().joinedAt === 'string' ? new Date(doc.data().joinedAt).toLocaleDateString() : new Date(doc.data().joinedAt.seconds * 1000).toLocaleDateString()) : 'Unknown'
-      }));
-      setUsers(usersData);
-      setLoading(false);
-    });
+    let active = true;
 
-    return () => unsub();
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/users`);
+        if (!response.ok) throw new Error('Failed to fetch users');
+        const data = await response.json();
+
+        if (!active) return;
+        const usersData = (Array.isArray(data) ? data : []).map((u: any) => ({
+          id: u.id,
+          name: u.fullName || 'No Name',
+          email: u.email || 'No Email',
+          role: u.role || 'student',
+          joined: u.joinedAt ? new Date(u.joinedAt).toLocaleDateString() : 'Unknown',
+        }));
+        setUsers(usersData);
+      } catch (err) {
+        if (active) toast.error('Failed to fetch users');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchUsers();
+    const timer = setInterval(fetchUsers, 5000);
+
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
   }, []);
 
   const handleRoleChange = async (uid: string, newRole: string) => {
     setUpdatingRole(uid);
     try {
-      const response = await fetch(`http://localhost:5000/api/users/${uid}/role`, {
+      const response = await fetch(`${API_BASE}/users/${uid}/role`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role: newRole })
       });
 
       if (!response.ok) throw new Error('Failed to update role');
+      setUsers((prev) => prev.map((u) => (u.id === uid ? { ...u, role: newRole } : u)));
       
       toast.success(`User role updated to ${newRole}`);
     } catch (err) {
@@ -169,7 +188,7 @@ export default function AdminManageUsers() {
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-5 py-10 text-center text-muted-foreground">No users found.</td>
+                    <td colSpan={6} className="px-5 py-10 text-center text-muted-foreground">No users found.</td>
                   </tr>
                 )}
               </tbody>

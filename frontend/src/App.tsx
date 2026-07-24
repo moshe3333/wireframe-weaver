@@ -23,6 +23,7 @@ import StudentResultDetail from "./pages/StudentResultDetail";
 import StudentProfile from "./pages/StudentProfile";
 import InstructorStudents from "./pages/InstructorStudents";
 import NotFound from "./pages/NotFound";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -36,24 +37,30 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/signin" element={<SignIn />} />
           <Route path="/register" element={<Register />} />
+
           {/* Admin routes */}
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/instructor-dashboard" element={<InstructorDashboard />} />
-          <Route path="/instructor-students" element={<InstructorStudents />} />
-          <Route path="/manage-users" element={<AdminManageUsers />} />
-          <Route path="/manage-exams" element={<AdminManageExams />} />
-          <Route path="/manage-subjects" element={<AdminManageSubjects />} />
-          <Route path="/upload" element={<UploadPapers />} />
-          <Route path="/all-evaluations" element={<AdminAllEvaluations />} />
-          <Route path="/eval-details" element={<EvalDetails />} />
-          <Route path="/model-answers" element={<AdminModelAnswers />} />
-          <Route path="/reports" element={<StudentResults />} />
-          <Route path="/profile" element={<Profile />} />
+          <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['admin']}><Dashboard /></ProtectedRoute>} />
+          <Route path="/manage-users" element={<ProtectedRoute allowedRoles={['admin']}><AdminManageUsers /></ProtectedRoute>} />
+          <Route path="/manage-exams" element={<ProtectedRoute allowedRoles={['admin', 'instructor']}><AdminManageExams /></ProtectedRoute>} />
+          <Route path="/manage-subjects" element={<ProtectedRoute allowedRoles={['admin', 'instructor']}><AdminManageSubjects /></ProtectedRoute>} />
+          <Route path="/model-answers" element={<ProtectedRoute allowedRoles={['admin', 'instructor']}><AdminModelAnswers /></ProtectedRoute>} />
+          <Route path="/all-evaluations" element={<ProtectedRoute allowedRoles={['admin']}><AdminAllEvaluations /></ProtectedRoute>} />
+          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+
+          {/* Instructor routes */}
+          <Route path="/instructor-dashboard" element={<ProtectedRoute allowedRoles={['instructor']}><InstructorDashboard /></ProtectedRoute>} />
+          <Route path="/instructor-students" element={<ProtectedRoute allowedRoles={['instructor', 'admin']}><InstructorStudents /></ProtectedRoute>} />
+          <Route path="/upload" element={<ProtectedRoute allowedRoles={['instructor', 'admin']}><UploadPapers /></ProtectedRoute>} />
+          <Route path="/eval-details" element={<ProtectedRoute allowedRoles={['instructor', 'admin']}><EvalDetails /></ProtectedRoute>} />
+          <Route path="/reports" element={<ProtectedRoute allowedRoles={['admin']}><StudentResults /></ProtectedRoute>} />
+
           {/* Student routes */}
-          <Route path="/student-dashboard" element={<StudentDashboard />} />
-          <Route path="/my-results" element={<StudentMyResults />} />
-          <Route path="/result-detail/:id" element={<StudentResultDetail />} />
-          <Route path="/student-profile" element={<StudentProfile />} />
+          <Route path="/student-dashboard" element={<ProtectedRoute allowedRoles={['student']}><StudentDashboard /></ProtectedRoute>} />
+          <Route path="/student-results" element={<ProtectedRoute allowedRoles={['student']}><StudentResults /></ProtectedRoute>} />
+          <Route path="/my-results" element={<ProtectedRoute allowedRoles={['student']}><StudentMyResults /></ProtectedRoute>} />
+          <Route path="/result-detail/:id" element={<ProtectedRoute allowedRoles={['student']}><StudentResultDetail /></ProtectedRoute>} />
+          <Route path="/student-profile" element={<ProtectedRoute allowedRoles={['student']}><StudentProfile /></ProtectedRoute>} />
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

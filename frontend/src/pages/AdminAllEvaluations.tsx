@@ -7,6 +7,7 @@ import { Search, Eye, Play, Loader2, RefreshCcw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import API_BASE from '@/lib/api';
 
 interface EvaluationResult {
   id: string;
@@ -25,16 +26,17 @@ export default function AdminAllEvaluations() {
   const { data: results = [], isLoading, isFetching } = useQuery({
     queryKey: ['evaluations'],
     queryFn: async () => {
-      const res = await fetch('http://localhost:5000/api/results');
+      const res = await fetch(`${API_BASE}/results`);
       if (!res.ok) throw new Error('Failed to fetch results');
       return res.json() as Promise<EvaluationResult[]>;
-    }
+    },
+    refetchInterval: 5000,
   });
 
   const mutation = useMutation({
     mutationFn: async () => {
       // Demo trigger for evaluation
-      const res = await fetch('http://localhost:5000/api/evaluate', {
+      const res = await fetch(`${API_BASE}/evaluate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ exam_id: 'sample_exam', roll_number: 'DEMO001' })
@@ -150,7 +152,7 @@ export default function AdminAllEvaluations() {
                       </td>
                       <td className="px-5 py-4 text-right">
                         <Link 
-                          to={`/evaluation/${r.id}`} 
+                          to={`/result-detail/${r.id}`} 
                           className="inline-flex items-center justify-center rounded-lg p-2 text-muted-foreground hover:bg-secondary hover:text-foreground transition-all"
                         >
                           <Eye className="h-4 w-4" />

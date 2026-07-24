@@ -5,10 +5,8 @@ import { Brain, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { auth, db } from '@/lib/firebase';
-import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
+import API_BASE, { setAuthData } from '@/lib/api';
 
 export default function SignIn() {
   const [showPw, setShowPw] = useState(false);
@@ -21,27 +19,30 @@ export default function SignIn() {
     e.preventDefault();
     setLoading(true);
     try {
-      // 1. Sign in with Firebase Auth
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      const resp = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
 
-      // 2. Fetch User Role from Firestore
-      const userDoc = await getDoc(doc(db, "users", user.uid));
-      const userData = userDoc.data();
-      const role = userData?.role || 'student';
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Login failed");
 
-      console.log('User signed in with role:', role);
-      toast.success('Successfully signed in!');
-      
-      if (role === 'student') {
-        navigate('/student-dashboard');
-      } else if (role === 'instructor') {
-        navigate('/instructor-dashboard');
-      } else if (role === 'admin') {
-        navigate('/dashboard');
-      } else {
-        navigate('/student-dashboard');
-      }
+      const role = (data.accountType || "student").trim().toLowerCase();
+
+      setAuthData({
+        token: data.token,
+        uid: data.uid,
+        role: role,
+        fullName: data.fullName,
+      });
+
+      toast.success("Successfully signed in!");
+
+      if (role === 'student') navigate('/student-dashboard');
+      else if (role === 'instructor') navigate('/instructor-dashboard');
+      else if (role === 'admin') navigate('/dashboard');
+      else navigate('/student-dashboard');
 
     } catch (error: any) {
       toast.error(error.message || 'Failed to sign in');
@@ -51,37 +52,8 @@ export default function SignIn() {
   };
 
   const handleGoogleSignIn = async () => {
-    const provider = new GoogleAuthProvider();
-    try {
-      const result = await signInWithPopup(auth, provider);
-      const user = result.user;
-
-      // Case for new users via Google: Check if exists, else create with default role
-      const userDocRef = doc(db, "users", user.uid);
-      const userDoc = await getDoc(userDocRef);
-      
-      let role = 'student';
-
-      if (!userDoc.exists()) {
-        await setDoc(userDocRef, {
-          fullName: user.displayName,
-          email: user.email,
-          role: 'student',
-          createdAt: new Date().toISOString()
-        });
-      } else {
-        role = userDoc.data()?.role || 'student';
-      }
-      
-      toast.success('Successfully signed in with Google!');
-      if (role === 'student') navigate('/student-dashboard');
-      else if (role === 'instructor') navigate('/instructor-dashboard');
-      else if (role === 'admin') navigate('/dashboard');
-      else navigate('/student-dashboard');
-      
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to sign in with Google');
-    }
+    // Google sign in removed
+    toast.info("Google Sign-In is currently disabled (Firebase removed)");
   };
 
   return (
@@ -127,10 +99,10 @@ export default function SignIn() {
           <form className="space-y-4" onSubmit={handleSignIn}>
             <div className="space-y-2">
               <Label>Email</Label>
-              <Input 
-                type="email" 
-                placeholder="you@example.com" 
-                required 
+              <Input
+                type="email"
+                placeholder="you@example.com"
+                required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
@@ -138,10 +110,10 @@ export default function SignIn() {
             <div className="space-y-2">
               <Label>Password</Label>
               <div className="relative">
-                <Input 
-                  type={showPw ? 'text' : 'password'} 
-                  placeholder="••••••••" 
-                  required 
+                <Input
+                  type={showPw ? 'text' : 'password'}
+                  placeholder="••••••••"
+                  required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
@@ -165,10 +137,10 @@ export default function SignIn() {
             <div className="relative flex justify-center"><span className="bg-background px-3 text-xs text-muted-foreground">or</span></div>
           </div>
 
-          <Button 
-            variant="outline" 
-            className="w-full" 
-            size="lg" 
+          <Button
+            variant="outline"
+            className="w-full"
+            size="lg"
             onClick={handleGoogleSignIn}
             disabled={loading}
           >

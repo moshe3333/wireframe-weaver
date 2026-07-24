@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload as UploadIcon, FileUp, X, Loader2, CheckCircle2, ChevronRight, ScanSearch, Cpu, Scale, PenTool, Printer, Eye, Users } from 'lucide-react';
 import { toast } from 'sonner';
+import API_BASE from '@/lib/api';
 
 export default function UploadPapers() {
   const [files, setFiles] = useState<File[]>([]);
@@ -28,7 +29,7 @@ export default function UploadPapers() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await fetch('http://localhost:5000/api/exams');
+        const res = await fetch(`${API_BASE}/exams`);
         const data = await res.json();
         setExams(data);
       } catch (err) {
@@ -45,7 +46,7 @@ export default function UploadPapers() {
     }
     setSearchingStudent(true);
     try {
-      const response = await fetch(`http://localhost:5000/api/users/${rollNumber}`);
+      const response = await fetch(`${API_BASE}/users/${rollNumber}`);
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Student not found');
       setStudentDetails(data);
@@ -80,7 +81,7 @@ export default function UploadPapers() {
       formData.append('exam_id', selectedExam);
       files.forEach((file) => formData.append('files', file));
 
-      const response = await fetch('http://localhost:5000/api/extract', {
+      const response = await fetch(`${API_BASE}/extract`, {
         method: 'POST',
         body: formData
       });
@@ -102,7 +103,7 @@ export default function UploadPapers() {
     if (!extractedData) return;
     setEvaluating(true);
     try {
-      const response = await fetch('http://localhost:5000/api/evaluate-confirm', {
+      const response = await fetch(`${API_BASE}/evaluate-confirm`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -128,7 +129,7 @@ export default function UploadPapers() {
     if (!studentDetails || !result) return;
     setRecording(true);
     try {
-      const response = await fetch('http://localhost:5000/api/record-ledger', {
+      const response = await fetch(`${API_BASE}/record-ledger`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -223,7 +224,7 @@ export default function UploadPapers() {
                   <p className="text-[10px] font-bold text-muted-foreground uppercase mb-2">Semantic Accuracy</p>
                   <p className="text-3xl font-black text-primary">{result.percentage}</p>
                 </div>
-                <div className="rounded-xl border border-border bg-success/5 p-6 text-center border-success/20">
+                <div className="rounded-xl border border-success/20 bg-success/5 p-6 text-center">
                   <p className="text-[10px] font-bold text-success uppercase mb-2">Performance Grade</p>
                   <p className="text-3xl font-black text-success">{result.grade}</p>
                 </div>
@@ -327,7 +328,7 @@ export default function UploadPapers() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-foreground">AI Extraction Workflow</h1>
-            <p className="text-sm text-muted-foreground uppercase font-black tracking-tight text-primary/60">Upload → Extract → Marks → UUID Assign</p>
+            <p className="text-sm uppercase font-black tracking-tight text-primary/60">Upload {"->"} Extract {"->"} Marks {"->"} UUID Assign</p>
           </div>
         </div>
 
@@ -396,7 +397,7 @@ export default function UploadPapers() {
                   className="hidden" 
                   ref={fileInputRef} 
                   onChange={onFileChange}
-                  accept=".pdf,.docx,.txt"
+                  accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp"
                 />
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
                   <FileUp className="h-7 w-7 text-primary" />

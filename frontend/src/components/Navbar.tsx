@@ -3,9 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Brain, Menu, X, User, LogOut, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import API_BASE, { getAuthData, clearAuthData } from '@/lib/api';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,31 +23,56 @@ export default function Navbar() {
   const isHome = location.pathname === '/';
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-        if (userDoc.exists()) {
-          setRole(userDoc.data().role || 'student');
-        }
-      } else {
-        setUser(null);
-      }
-    });
-    return () => unsubscribe();
-  }, []);
+    const data = getAuthData();
+    if (data.token) {
+      setUser({ uid: data.uid, displayName: data.fullName });
+      setRole(data.role || 'student');
+    } else {
+      setUser(null);
+    }
+  }, [location.pathname]);
 
   const handleSignOut = async () => {
-    await signOut(auth);
+    clearAuthData();
     setUser(null);
     navigate('/');
   };
 
-  const dashboardPath = role === 'student' 
-    ? '/student-dashboard' 
-    : role === 'instructor' 
-      ? '/instructor-dashboard' 
-      : '/dashboard';
+  // Simplified and consolidated role-based redirection
+  const getDashboardPath = (userRole: string) => {
+    const roleLower = userRole?.toLowerCase();
+    if (roleLower === 'instructor') return '/instructor-dashboard';
+    if (roleLower === 'admin') return '/dashboard';
+    return '/student-dashboard';
+  };
+
+  const dashboardPath = getDashboardPath(role);
+
+  const handleDashboardClick = async () => {
+    const auth = getAuthData();
+    const fallbackPath = getDashboardPath(auth.role || role || 'student');
+
+    if (!auth.uid) {
+      navigate(fallbackPath);
+      return;
+    }
+
+    try {
+      const resp = await fetch(`${API_BASE}/users/${auth.uid}`);
+      if (!resp.ok) {
+        navigate(fallbackPath);
+        return;
+      }
+
+      const data = await resp.json();
+      const accountType = (data.accountType || auth.role || role || 'student').toLowerCase();
+      setRole(accountType);
+      localStorage.setItem('auth_role', accountType);
+      navigate(getDashboardPath(accountType));
+    } catch {
+      navigate(fallbackPath);
+    }
+  };
 
   return (
     <motion.nav
@@ -84,16 +108,21 @@ export default function Navbar() {
               <DropdownMenuTrigger asChild>
                 <button 
                   aria-label="User menu"
-                  title="User menu"
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-card text-primary transition-colors hover:bg-secondary"
+                  title={user.displayName || "User menu"}
+                  className="rounded-full border border-border scale-95 hover:scale-100 transition-transform"
                 >
-                  <User className="h-4 w-4" />
+                  <Avatar className="h-9 w-9">
+                    <AvatarImage src="" />
+                    <AvatarFallback className="bg-primary text-primary-foreground">
+                      {user.displayName?.substring(0, 2).toUpperCase() || 'U'}
+                    </AvatarFallback>
+                  </Avatar>
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuLabel>Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate(dashboardPath)}>
+                <DropdownMenuItem onClick={handleDashboardClick}>
                   <LayoutDashboard className="mr-2 h-4 w-4" />
                   Dashboard
                 </DropdownMenuItem>
@@ -134,7 +163,7 @@ export default function Navbar() {
           <div className="flex flex-col gap-3">
             {user ? (
               <>
-                <Link to={dashboardPath} className="text-sm font-medium text-foreground">Dashboard</Link>
+                <button onClick={handleDashboardClick} className="text-left text-sm font-medium text-foreground">Dashboard</button>
                 <button onClick={handleSignOut} className="text-left text-sm font-medium text-destructive">Sign Out</button>
               </>
             ) : (

@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Trophy, BarChart3, Award, Search, Eye, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { auth } from '@/lib/firebase';
+import API_BASE, { getAuthData } from '@/lib/api';
 import { toast } from 'sonner';
 
 export default function StudentMyResults() {
@@ -15,17 +15,17 @@ export default function StudentMyResults() {
 
   useEffect(() => {
     const fetchResults = async () => {
-      const user = auth.currentUser;
-      if (!user) {
+      const auth = getAuthData();
+      if (!auth.token || !auth.uid) {
         setLoading(false);
         return;
       }
 
       try {
-        const response = await fetch(`http://localhost:5000/api/students/results/${user.uid}`);
+        const response = await fetch(`${API_BASE}/evaluations?roll_number=${auth.uid}`);
         if (!response.ok) throw new Error('Failed to fetch results');
         const data = await response.json();
-        setResults(data);
+        setResults(Array.isArray(data) ? data : []);
       } catch (err) {
         console.error(err);
         toast.error('Failed to load your results');
@@ -43,7 +43,7 @@ export default function StudentMyResults() {
 
   // Calculate stats from real data
   const totalExams = results.length;
-  const avgScore = results.length > 0 
+  const avgScore = results.length > 0
     ? Math.round(results.reduce((acc, curr) => acc + (curr.percentage ? parseInt(curr.percentage) : 0), 0) / results.length)
     : 0;
   const bestScore = results.length > 0
@@ -112,13 +112,12 @@ export default function StudentMyResults() {
                   <div className="flex items-center gap-4">
                     <div className="text-right">
                       <p className="font-mono font-bold text-foreground">{r.score}/{r.total}</p>
-                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${
-                        (parseInt(r.percentage) >= 80) ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
-                      }`}>
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-semibold ${(parseInt(r.percentage) >= 80) ? 'bg-success/10 text-success' : 'bg-warning/10 text-warning'
+                        }`}>
                         {r.grade}
                       </span>
                     </div>
-                    <Link to={`/result-detail/${r.id}`}>
+                    <Link to={`/result-detail/${r._id || r.id}`}>
                       <Button variant="outline" size="sm">
                         <Eye className="mr-1.5 h-3.5 w-3.5" />
                         View

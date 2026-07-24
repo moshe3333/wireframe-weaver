@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { User, Mail, Shield, BookOpen, BarChart3, Clock, Loader2, Save } from 'lucide-react';
-import { auth, db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+// import { auth, db } from '@/lib/firebase';
+// import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
 
 export default function Profile() {
@@ -20,6 +20,8 @@ export default function Profile() {
   });
 
   useEffect(() => {
+    // Firebase auth and doc fetching removed
+    /*
     const unsub = auth.onAuthStateChanged(async (user) => {
       if (user) {
         const userDoc = await getDoc(doc(db, "users", user.uid));
@@ -36,19 +38,23 @@ export default function Profile() {
       setLoading(false);
     });
     return () => unsub();
+    */
+    setLoading(false);
   }, []);
 
   const handleSave = async () => {
-    const user = auth.currentUser;
-    if (!user) return;
+    // const user = auth.currentUser;
+    // if (!user) return;
 
     setSaving(true);
     try {
+      /*
       await updateDoc(doc(db, "users", user.uid), {
         fullName: formData.fullName,
         phone: formData.phone,
         rollNumber: formData.rollNumber
       });
+      */
       toast.success('Profile updated successfully!');
     } catch (err) {
       toast.error('Failed to update profile');
@@ -87,7 +93,7 @@ export default function Profile() {
               <div className="flex flex-col gap-1 mt-1">
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Mail className="h-3.5 w-3.5" />
-                  {auth.currentUser?.email}
+                  {/* auth.currentUser?.email */}
                 </div>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Shield className="h-3.5 w-3.5 capitalize text-primary" />
@@ -122,7 +128,7 @@ export default function Profile() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
-                <Input id="email" value={auth.currentUser?.email || ''} type="email" readOnly className="bg-secondary/50" />
+                <Input id="email" value={/* auth.currentUser?.email || */ ''} type="email" readOnly className="bg-secondary/50" />
                 <p className="text-[10px] text-muted-foreground">Email cannot be changed.</p>
               </div>
             </div>

@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Calendar, Clock, FileText, Eye, Loader2, Save } from 'lucide-react';
 import { toast } from 'sonner';
-import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import API_BASE from '@/lib/api';
+// import { db } from '@/lib/firebase';
+// import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import {
   Dialog,
   DialogContent,
@@ -46,21 +47,42 @@ export default function AdminManageExams() {
 
   // Real-time synchronization with Firestore "exams" collection
   useEffect(() => {
-    const q = query(collection(db, 'exams'), orderBy('date', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const examsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Exam[];
-      setExams(examsData);
-      setLoading(false);
-    }, (error) => {
-      console.error("Firestore Listen Error:", error);
-      toast.error("Failed to load real-time exam data");
-      setLoading(false);
-    });
+    let active = true;
 
-    return () => unsubscribe();
+    const fetchExams = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/exams`);
+        if (!response.ok) throw new Error('Failed to fetch exams');
+        const data = await response.json();
+
+        if (!active) return;
+        const examsData = (Array.isArray(data) ? data : []).map((e: any) => ({
+          id: e.id,
+          title: e.title,
+          subject: e.subject,
+          date: e.date,
+          duration: e.duration,
+          questions: e.questions || 0,
+          status: e.status || 'Upcoming',
+        })) as Exam[];
+        setExams(examsData);
+      } catch (error) {
+        if (active) {
+          console.error('Exams fetch error:', error);
+          toast.error('Failed to load exam data');
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchExams();
+    const timer = setInterval(fetchExams, 5000);
+
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
   }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -72,7 +94,7 @@ export default function AdminManageExams() {
 
     setIsSaving(true);
     try {
-      const response = await fetch('http://localhost:5000/api/exams', {
+      const response = await fetch(`${API_BASE}/exams`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newExam)
@@ -80,7 +102,7 @@ export default function AdminManageExams() {
 
       if (!response.ok) throw new Error('Failed to create exam');
       
-      toast.success('Exam successfully created and stored in Firestore');
+      toast.success('Exam successfully created and stored in MongoDB');
       setIsDialogOpen(false);
       setNewExam({ title: '', subject: '', date: '', duration: '', questions: 10, status: 'Upcoming' });
     } catch (err) {
@@ -129,7 +151,7 @@ export default function AdminManageExams() {
               <DialogHeader>
                 <DialogTitle>Create New Exam</DialogTitle>
                 <DialogDescription>
-                  This exam will be stored in the Firebase Firestore collection.
+                  Enter the exam details below.
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleCreate} className="grid gap-4 py-4">
@@ -177,7 +199,7 @@ export default function AdminManageExams() {
                 <DialogFooter className="mt-4">
                   <Button type="submit" className="w-full" disabled={isSaving}>
                     {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                    Save to Firestore
+                    Save to MongoDB
                   </Button>
                 </DialogFooter>
               </form>

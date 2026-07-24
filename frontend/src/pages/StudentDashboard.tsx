@@ -2,9 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import DashboardLayout from '@/components/DashboardLayout';
 import { GraduationCap, BarChart3, Clock, TrendingUp, Loader2 } from 'lucide-react';
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import API_BASE, { getAuthData } from '@/lib/api';
 
 export default function StudentDashboard() {
   const [loading, setLoading] = useState(true);
@@ -18,44 +16,45 @@ export default function StudentDashboard() {
   ]);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        setUserName(user.displayName || 'Student');
-        
-        // Setup real-time listener for student evaluations
-        const q = query(
-          collection(db, "evaluations"), 
-          where("roll_number", "==", user.uid)
-        );
+    const auth = getAuthData();
+    if (auth.token && auth.uid) {
+      setUserName(auth.fullName || 'Student');
 
-        const unsubscribeResults = onSnapshot(q, (snapshot) => {
-          const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          setResultsData(data);
+      // Fetch student evaluations from MongoDB
+      Promise.all([
+        fetch(`${API_BASE}/evaluations?roll_number=${auth.uid}`).then(res => res.ok ? res.json() : []),
+        fetch(`${API_BASE}/exams`).then(res => res.ok ? res.json() : [])
+      ])
+        .then(([evalsData, examsData]) => {
+          const evalArray = Array.isArray(evalsData) ? evalsData : [];
+          const examArray = Array.isArray(examsData) ? examsData : [];
 
-          // Calculate Real-time Stats
-          const totalExams = data.length;
-          const evaluated = data.length; // Since they are in evaluations, they are evaluated
-          const pending = 0;
-          const scores = data.map((r: any) => ((r.total_score || 0) / (r.max_score || 100)) * 100);
-          const avgScore = scores.length > 0 ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : 0;
+          setResultsData(evalArray);
+
+          const totalTaken = evalArray.length;
+          const totalExams = examArray.length;
+          const pending = Math.max(0, totalExams - totalTaken);
+
+          const percentages = evalArray.map((r: any) => parseFloat(r.percentage) || 0);
+          const avg = percentages.length > 0
+            ? Math.round(percentages.reduce((a: number, b: number) => a + b, 0) / percentages.length)
+            : 0;
 
           setStats([
             { label: 'Total Exams', value: String(totalExams), icon: GraduationCap },
-            { label: 'Results Out', value: String(evaluated), icon: BarChart3 },
+            { label: 'Results Out', value: String(totalTaken), icon: BarChart3 },
             { label: 'Pending', value: String(pending), icon: Clock },
-            { label: 'Avg Score', value: `${avgScore}%`, icon: TrendingUp },
+            { label: 'Avg Score', value: `${avg}%`, icon: TrendingUp },
           ]);
-          
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error("Fetch error:", err);
           setLoading(false);
         });
-
-        return () => unsubscribeResults();
-      } else {
-        setLoading(false);
-      }
-    });
-
-    return () => unsubscribeAuth();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   if (loading) {
@@ -103,15 +102,15 @@ export default function StudentDashboard() {
                 </div>
               ) : (
                 resultsData.map((r) => (
-                  <div key={r.id} className="px-5 py-4 space-y-2">
+                  <div key={r._id || r.id} className="px-5 py-4 space-y-2">
                     <div className="flex items-center justify-between">
-                      <p className="text-sm font-bold text-foreground">{r.exam_name || 'Exam Result'}</p>
-                      <p className="text-sm font-mono font-black text-primary">{r.total_score || 0}/{r.max_score || 0}</p>
+                      <p className="text-sm font-bold text-foreground">{r.exam_id || 'Exam Result'}</p>
+                      <p className="text-sm font-mono font-black text-primary">{r.score || 0}/{r.total || 0}</p>
                     </div>
                     <div className="h-2 overflow-hidden rounded-full bg-secondary">
-                      <div 
-                        className="h-full rounded-full bg-primary transition-all duration-1000" 
-                        style={{ width: `${((r.total_score || 0) / (r.max_score || 1)) * 100}%` }} 
+                      <div
+                        className="h-full rounded-full bg-primary transition-all duration-1000"
+                        style={{ width: `${((r.score || 0) / (r.total || 1)) * 100}%` }}
                       />
                     </div>
                   </div>
@@ -129,12 +128,12 @@ export default function StudentDashboard() {
               <div className="relative flex h-40 w-40 items-center justify-center">
                 <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
                   <circle cx="50" cy="50" r="42" fill="none" className="stroke-secondary" strokeWidth="8" />
-                  <circle 
-                    cx="50" cy="50" r="42" fill="none" 
-                    className="stroke-primary transition-all duration-1000" 
-                    strokeWidth="8" 
-                    strokeDasharray={`${performancePct * 2.64} 264`} 
-                    strokeLinecap="round" 
+                  <circle
+                    cx="50" cy="50" r="42" fill="none"
+                    className="stroke-primary transition-all duration-1000"
+                    strokeWidth="8"
+                    strokeDasharray={`${performancePct * 2.64} 264`}
+                    strokeLinecap="round"
                   />
                 </svg>
                 <div className="absolute text-center">

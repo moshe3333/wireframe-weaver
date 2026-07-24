@@ -2,19 +2,28 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import DashboardLayout from '@/components/DashboardLayout';
 import { User, Mail, Shield, Hash, Calendar, Loader2 } from 'lucide-react';
-import { auth } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import API_BASE, { getAuthData } from '@/lib/api';
 
 export default function StudentProfile() {
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<any>(null);
+  const [userData, setUserData] = useState<any>(null);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u);
+    const auth = getAuthData();
+    if (auth.token && auth.uid) {
+      fetch(`${API_BASE}/users/${auth.uid}`)
+        .then(res => res.json())
+        .then(data => {
+          setUserData(data);
+          setLoading(false);
+        })
+        .catch(err => {
+          console.error("Profile fetch error:", err);
+          setLoading(false);
+        });
+    } else {
       setLoading(false);
-    });
-    return () => unsub();
+    }
   }, []);
 
   if (loading) {
@@ -28,10 +37,9 @@ export default function StudentProfile() {
   }
 
   const info = [
-    { label: 'Full Name', value: user?.profile?.name || 'User', icon: User },
-    { label: 'Email', value: user?.email, icon: Mail },
-    { label: 'Verified Status', value: user?.emailVerified ? 'Verified' : 'Pending Verification', icon: Shield },
-    { label: 'Joined Date', value: new Date(user?.createdAt).toLocaleDateString(), icon: Calendar },
+    { label: 'Full Name', value: userData?.fullName || 'User', icon: User },
+    { label: 'Email', value: userData?.email || 'N/A', icon: Mail },
+    { label: 'User ID', value: userData?.id || 'N/A', icon: Hash },
   ];
 
   return (
@@ -49,14 +57,10 @@ export default function StudentProfile() {
               <User className="h-10 w-10 text-primary" />
             </div>
             <div>
-              <p className="text-lg font-semibold text-foreground">{user?.profile?.name || 'User'}</p>
+              <p className="text-lg font-semibold text-foreground">{userData?.fullName || 'User'}</p>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Mail className="h-3.5 w-3.5" />
-                {user?.email}
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Shield className="h-3.5 w-3.5" />
-                Student
+                {userData?.email}
               </div>
             </div>
           </div>

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Brain, LayoutDashboard, Upload, FileCheck, BarChart3, Users, BookOpen, FileText, ClipboardList, GraduationCap, User, LogOut, ChevronDown, Loader2 } from 'lucide-react';
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+// import { auth, db } from '@/lib/firebase';
+// import { onAuthStateChanged, signOut } from 'firebase/auth';
+// import { doc, getDoc } from 'firebase/firestore';
 import { toast } from 'sonner';
+import API_BASE, { clearAuthData, getAuthData } from '@/lib/api';
 
 import {
   DropdownMenu,
@@ -51,29 +52,39 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        setUser(firebaseUser);
-        try {
-          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-          if (userDoc.exists()) {
-            setRole(userDoc.data().role || 'student');
-          }
-        } catch (err) {
-          console.error("Error fetching role:", err);
-        }
-        setLoading(false);
-      } else {
-        navigate('/signin');
-      }
-    });
+    const loadUserAndRole = async () => {
+      const auth = getAuthData();
 
-    return () => unsubscribe();
+      if (!auth.token || !auth.uid) {
+        navigate('/signin');
+        return;
+      }
+
+      setUser({ profile: { name: auth.fullName || 'User' }, uid: auth.uid });
+
+      try {
+        const resp = await fetch(`${API_BASE}/users/${auth.uid}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          const accountType = (data.accountType || auth.role || 'student').trim().toLowerCase();
+          setRole(accountType);
+          localStorage.setItem('auth_role', accountType);
+        } else {
+          setRole((auth.role || 'student').trim().toLowerCase());
+        }
+      } catch {
+        setRole((auth.role || 'student').trim().toLowerCase());
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserAndRole();
   }, [navigate]);
 
   const handleSignOut = async () => {
     try {
-      await signOut(auth);
+      clearAuthData();
       toast.success('Signed out successfully');
       navigate('/');
     } catch (error) {
@@ -83,7 +94,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   let links = studentLinks;
   let welcomeLabel = "Student";
-  
+
   if (role === 'instructor') {
     links = instructorLinks;
     welcomeLabel = "Instructor";
@@ -121,11 +132,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Link
                 key={link.to}
                 to={link.to}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${
-                  active
-                    ? 'bg-primary/10 text-primary shadow-sm'
-                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-                }`}
+                className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200 ${active
+                  ? 'bg-primary/10 text-primary shadow-sm'
+                  : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  }`}
               >
                 <link.icon className={`h-4 w-4 ${active ? 'text-primary' : ''}`} />
                 {link.label}

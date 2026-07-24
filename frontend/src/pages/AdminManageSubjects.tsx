@@ -5,8 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, Search, Edit, Trash2, Loader2, Save, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
-import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
+import API_BASE from '@/lib/api';
+// import { db } from '@/lib/firebase';
+// import { collection, onSnapshot, query, orderBy } from 'firebase/firestore';
 import {
   Dialog,
   DialogContent,
@@ -40,21 +41,39 @@ export default function AdminManageSubjects() {
 
   // Real-time synchronization with Firestore "subjects" collection
   useEffect(() => {
-    const q = query(collection(db, 'subjects'), orderBy('name', 'asc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const subjectsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Subject[];
-      setSubjects(subjectsData);
-      setLoading(false);
-    }, (error) => {
-      console.error("Firestore Listen Error:", error);
-      toast.error("Failed to sync subject data");
-      setLoading(false);
-    });
+    let active = true;
 
-    return () => unsubscribe();
+    const fetchSubjects = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/subjects`);
+        if (!response.ok) throw new Error('Failed to fetch subjects');
+        const data = await response.json();
+
+        if (!active) return;
+        const subjectsData = (Array.isArray(data) ? data : []).map((s: any) => ({
+          id: s._id || s.id,
+          code: s.code,
+          name: s.name,
+          description: s.description || '',
+        })) as Subject[];
+        setSubjects(subjectsData);
+      } catch (error) {
+        if (active) {
+          console.error('Subjects fetch error:', error);
+          toast.error('Failed to sync subject data');
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchSubjects();
+    const timer = setInterval(fetchSubjects, 5000);
+
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
   }, []);
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -66,7 +85,7 @@ export default function AdminManageSubjects() {
 
     setIsSaving(true);
     try {
-      const response = await fetch('http://localhost:5000/api/subjects', {
+      const response = await fetch(`${API_BASE}/subjects`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newSubject)
@@ -74,7 +93,7 @@ export default function AdminManageSubjects() {
 
       if (!response.ok) throw new Error('Failed to create subject');
       
-      toast.success('Subject added and synced to Firestore');
+      toast.success('Subject added and synced to MongoDB');
       setIsDialogOpen(false);
       setNewSubject({ code: '', name: '', description: '' });
     } catch (err) {
@@ -121,7 +140,7 @@ export default function AdminManageSubjects() {
             </DialogTrigger>
             <DialogContent className="sm:max-w-[425px]">
               <DialogHeader>
-                <DialogTitle>Add Subject to Firestore</DialogTitle>
+                <DialogTitle>Add Subject to MongoDB</DialogTitle>
                 <DialogDescription>
                   Adding a subject here will trigger real-time updates for all instructors.
                 </DialogDescription>

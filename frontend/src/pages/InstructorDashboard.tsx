@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import DashboardLayout from '@/components/DashboardLayout';
 import { BookOpen, Users, FileText, CheckCircle, Loader2, ArrowRight, Upload as UploadIcon, ClipboardList } from 'lucide-react';
-import { db } from '@/lib/firebase';
-import { collection, onSnapshot, query, limit, orderBy, where } from 'firebase/firestore';
+// import { db } from '@/lib/firebase';
+// import { collection, onSnapshot, query, limit, orderBy, where } from 'firebase/firestore';
 import { Link } from 'react-router-dom';
+import API_BASE from '@/lib/api';
 
 export default function InstructorDashboard() {
   const [stats, setStats] = useState([
@@ -18,74 +19,49 @@ export default function InstructorDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubSubjects = onSnapshot(collection(db, 'subjects'), (snap) => {
-      setStats(prev => [
-        { ...prev[0], value: snap.size.toString() },
-        prev[1], prev[2], prev[3]
-      ]);
-    });
-
-    const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-      const students = snap.docs.filter(d => (d.data().role || 'student').toLowerCase() === 'student').length;
-      setStats(prev => [
-        prev[0],
-        { ...prev[1], value: students.toString() },
-        prev[2], prev[3]
-      ]);
-    });
-
-    const unsubExams = onSnapshot(collection(db, 'exams'), (snap) => {
-      setStats(prev => [
-        prev[0], prev[1],
-        { ...prev[2], value: snap.size.toString() },
-        prev[3]
-      ]);
-    });
-
-    const unsubEvals = onSnapshot(collection(db, 'evaluations'), (snap) => {
-      setStats(prev => [
-        prev[0], prev[1], prev[2],
-        { ...prev[3], value: snap.size.toString() }
-      ]);
-    });
-
-    const qRecent = query(collection(db, 'evaluations'), orderBy('timestamp', 'desc'), limit(5));
-    const unsubRecent = onSnapshot(qRecent, (snap) => {
-      const data = snap.docs.map(doc => ({
-        id: doc.id,
-        title: `${doc.data().exam_id} - ${doc.data().student_roll}`,
-        time: doc.data().timestamp ? new Date(doc.data().timestamp.seconds * 1000).toLocaleTimeString() : 'Recently',
-        status: doc.data().status === 'success' ? 'Completed' : 'Pending'
-      }));
-      setRecentEvals(data);
-      setLoading(false);
-    });
-
-    const fetchStudents = async () => {
+    const fetchDashboardData = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/students/list');
-        if (response.ok) {
-          const data = await response.json();
-          setStudentsList(data.map((s: any) => ({
-            id: s.id,
-            name: s.fullName || s.email?.split('@')[0] || 'Student',
-            email: s.email
-          })));
-        }
+        const [subRes, stuRes, examRes, evalRes] = await Promise.all([
+          fetch(`${API_BASE}/subjects`),
+          fetch(`${API_BASE}/students/list`),
+          fetch(`${API_BASE}/exams`),
+          fetch(`${API_BASE}/evaluations`)
+        ]);
+
+        const subjects = subRes.ok ? await subRes.json() : [];
+        const students = stuRes.ok ? await stuRes.json() : [];
+        const exams = examRes.ok ? await examRes.json() : [];
+        const evaluations = evalRes.ok ? await evalRes.json() : [];
+
+        setStats([
+          { label: 'My Subjects', value: subjects.length.toString(), icon: BookOpen },
+          { label: 'Total Students', value: students.length.toString(), icon: Users },
+          { label: 'Total Exams', value: exams.length.toString(), icon: FileText },
+          { label: 'Evaluated', value: evaluations.length.toString(), icon: CheckCircle },
+        ]);
+
+        setStudentsList(students.map((s: any) => ({
+          id: s.id,
+          name: s.fullName || s.email?.split('@')[0] || 'Student',
+          email: s.email
+        })));
+
+        const recent = evaluations.slice(0, 5).map((doc: any) => ({
+          id: doc._id || doc.id,
+          title: `${doc.exam_id} - ${doc.roll_number}`,
+          time: doc.timestamp ? new Date(doc.timestamp).toLocaleString() : 'Recently',
+          status: 'Completed' // or derive from doc logic if needed
+        }));
+
+        setRecentEvals(recent);
       } catch (err) {
-        console.error("Dashboard student list error:", err);
+        console.error("Dashboard fetch error:", err);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchStudents();
-
-    return () => {
-      unsubSubjects();
-      unsubUsers();
-      unsubExams();
-      unsubEvals();
-      unsubRecent();
-    };
+    fetchDashboardData();
   }, []);
 
   if (loading) {
@@ -138,10 +114,9 @@ export default function InstructorDashboard() {
                       <p className="text-sm font-medium text-foreground">{activity.title}</p>
                       <p className="text-xs text-muted-foreground">Evaluation • {activity.time}</p>
                     </div>
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                      activity.status === 'Completed' ? 'bg-success/10 text-success' :
-                      'bg-warning/10 text-warning'
-                    }`}>
+                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${activity.status === 'Completed' ? 'bg-success/10 text-success' :
+                        'bg-warning/10 text-warning'
+                      }`}>
                       {activity.status}
                     </span>
                   </div>
@@ -154,29 +129,29 @@ export default function InstructorDashboard() {
           <div className="rounded-xl border border-border bg-card p-6">
             <h2 className="font-semibold text-foreground mb-4">Quick Actions</h2>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Link 
-                to="/manage-exams" 
+              <Link
+                to="/manage-exams"
                 className="flex flex-col items-center justify-center rounded-xl bg-secondary p-6 transition-all hover:bg-primary/10 group"
               >
                 <FileText className="h-8 w-8 text-primary mb-3 group-hover:scale-110 transition-transform" />
                 <span className="text-sm font-semibold">Exams</span>
               </Link>
-              <Link 
-                to="/model-answers" 
+              <Link
+                to="/model-answers"
                 className="flex flex-col items-center justify-center rounded-xl bg-secondary p-6 transition-all hover:bg-primary/10 group"
               >
                 <ClipboardList className="h-8 w-8 text-primary mb-3 group-hover:scale-110 transition-transform" />
                 <span className="text-sm font-semibold">Answer Keys</span>
               </Link>
-              <Link 
-                to="/instructor-students" 
+              <Link
+                to="/instructor-students"
                 className="flex flex-col items-center justify-center rounded-xl bg-secondary p-6 transition-all hover:bg-primary/10 group"
               >
                 <Users className="h-8 w-8 text-primary mb-3 group-hover:scale-110 transition-transform" />
                 <span className="text-sm font-semibold">Students</span>
               </Link>
-              <Link 
-                to="/upload" 
+              <Link
+                to="/upload"
                 className="flex flex-col items-center justify-center rounded-xl bg-secondary p-6 transition-all hover:bg-primary/10 group"
               >
                 <UploadIcon className="h-8 w-8 text-primary mb-3 group-hover:scale-110 transition-transform" />
