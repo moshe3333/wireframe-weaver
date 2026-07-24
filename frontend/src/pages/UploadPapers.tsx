@@ -85,10 +85,10 @@ export default function UploadPapers() {
         method: 'POST',
         body: formData
       });
-      
+
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Extraction failed');
-      
+
       setExtractedData(data.extracted_data);
       toast.success('Document text extracted successfully!');
     } catch (err: any) {
@@ -112,10 +112,10 @@ export default function UploadPapers() {
           extracted_data: extractedData
         })
       });
-      
+
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Evaluation failed');
-      
+
       setResult(data);
       toast.success('AI Semantic Evaluation Complete!');
     } catch (err: any) {
@@ -162,7 +162,7 @@ export default function UploadPapers() {
               <h1 className="text-3xl font-black uppercase tracking-tight">AI Evaluation Complete</h1>
               <p className="mt-2 opacity-80">Student: <span className="font-bold underline">{result.roll_number}</span> • Match: {result.percentage}</p>
             </div>
-            
+
             <div className="p-8 space-y-8">
               {/* Result Attribution Header */}
               <div className="flex flex-col md:flex-row items-center justify-between bg-primary/5 p-6 rounded-2xl border-2 border-primary/20 gap-6">
@@ -178,8 +178,8 @@ export default function UploadPapers() {
 
                 {!studentDetails ? (
                   <div className="flex flex-col sm:flex-row items-center gap-2 w-full md:w-auto">
-                    <Input 
-                      placeholder="Enter Student UUID to Import Marks..." 
+                    <Input
+                      placeholder="Enter Student UUID to Import Marks..."
                       className="w-full md:w-[280px] font-mono text-xs h-11 bg-white border-primary/40 focus:ring-primary shadow-sm"
                       value={rollNumber}
                       onChange={(e) => setRollNumber(e.target.value)}
@@ -199,8 +199,8 @@ export default function UploadPapers() {
                       <p className="text-sm font-bold text-foreground truncate max-w-[150px]">{studentDetails.fullName}</p>
                     </div>
                     <div className="flex gap-2">
-                      <Button 
-                        className="bg-success hover:bg-success/90 text-white font-black px-6 h-11 shadow-lg shadow-success/20" 
+                      <Button
+                        className="bg-success hover:bg-success/90 text-white font-black px-6 h-11 shadow-lg shadow-success/20"
                         onClick={handleRecordToLedger}
                         disabled={recording}
                       >
@@ -237,7 +237,7 @@ export default function UploadPapers() {
                     Evaluation Breakdown
                   </h3>
                 </div>
-                
+
                 <div className="space-y-6">
                   {result.details && result.details.map((d: any, i: number) => (
                     <div key={i} className="rounded-2xl border-2 border-border bg-card overflow-hidden shadow-sm hover:border-primary/40 transition-all">
@@ -364,11 +364,11 @@ export default function UploadPapers() {
             </div>
             <div className="space-y-2">
               <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Roll Number</Label>
-              <Input 
-                placeholder="e.g. STU-990" 
-                className="h-11 shadow-sm" 
-                value={rollNumber} 
-                onChange={(e) => setRollNumber(e.target.value)} 
+              <Input
+                placeholder="e.g. STU-990"
+                className="h-11 shadow-sm"
+                value={rollNumber}
+                onChange={(e) => setRollNumber(e.target.value)}
                 disabled={!!extractedData}
               />
             </div>
@@ -387,21 +387,16 @@ export default function UploadPapers() {
                   const newFiles = Array.from(e.dataTransfer.files);
                   setFiles(prev => [...prev, ...newFiles]);
                 }}
-                className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-12 text-center transition-all bg-secondary/5 ${
-                  dragOver ? 'border-primary bg-primary/5 scale-102 shadow-lg' : 'border-border hover:border-primary/40'
-                }`}
+                className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-12 text-center transition-all bg-secondary/5 ${dragOver ? 'border-primary bg-primary/5 scale-102 shadow-lg' : 'border-border hover:border-primary/40'
+                  }`}
               >
-                <input 
-                  type="file" 
-                  multiple 
-                  className="hidden" 
-                  ref={fileInputRef} 
+                <input
+                  type="file"
+                  multiple
+                  className="hidden"
+                  ref={fileInputRef}
                   onChange={onFileChange}
-<<<<<<< HEAD
-                  accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp"
-=======
-                  accept=".json,application/json"
->>>>>>> 6421e05d1a7dbcebc604def116694ef4c2e9f16e
+                  accept=".pdf,.docx,.txt,.jpg,.jpeg,.png,.webp,.json,application/json"
                 />
                 <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
                   <FileUp className="h-7 w-7 text-primary" />
@@ -461,17 +456,17 @@ export default function UploadPapers() {
                   </div>
                   <h3 className="font-black text-success uppercase text-sm">Extraction Successful</h3>
                 </div>
-                
+
                 <div className="flex w-full gap-3">
-                  <Button 
+                  <Button
                     className="flex-1 h-12 font-black uppercase tracking-tight text-xs bg-secondary hover:bg-secondary/80 text-foreground border border-border"
                     onClick={() => setShowJson(!showJson)}
                   >
                     <Eye className="mr-2 h-4 w-4" />
                     {showJson ? "Hide JSON Reveal" : "Reveal Document JSON"}
                   </Button>
-                  
-                  <Button 
+
+                  <Button
                     className="flex-1 h-12 font-black uppercase tracking-tight text-xs bg-primary shadow-xl shadow-primary/20"
                     onClick={handleConfirmEvaluation}
                     disabled={evaluating}
@@ -506,10 +501,10 @@ export default function UploadPapers() {
                   </div>
                 </motion.div>
               )}
-              
-              <Button 
-                variant="ghost" 
-                size="sm" 
+
+              <Button
+                variant="ghost"
+                size="sm"
                 className="w-full text-muted-foreground text-[10px] uppercase font-bold"
                 onClick={() => {
                   setExtractedData(null);
