@@ -1,0 +1,24 @@
+{
+    "qa": [
+        {
+            "question": "What is your name?",
+            "answer": "My name is Ravi."
+        },
+        {
+            "question": "How old are you?",
+            "answer": "I am 7 years old."
+        },
+        {
+            "question": "What color is the sky?",
+            "answer": "The sky is blue."
+        },
+        {
+            "question": "How many legs does a dog have?",
+            "answer": "A dog has four legs."
+        },
+        {
+            "question": "What do you eat in the morning?",
+            "answer": "I eat breakfast in the morning."
+        }
+    ]
+}
